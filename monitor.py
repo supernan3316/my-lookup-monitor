@@ -8,7 +8,8 @@ SC_SENDKEY = os.environ.get('SC_SENDKEY')
 def fetch_lookup_products():
     url = "https://www.megahouse.co.jp/products/lookup/"
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        "Accept-Language": "ja,en-US;q=0.9,en;q=0.8"
     }
     
     print(f"开始访问官网: {url}")
@@ -21,17 +22,27 @@ def fetch_lookup_products():
             return []
 
         soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # 修正爬取逻辑：根据官网最新的 class 结构抓取
         products = []
-        # 尝试抓取所有的商品标题
-        items = soup.select('.m-productsList_itemTitle') or soup.select('p.title')
+
+        # 策略 1: 寻找所有可能的商品标题 class
+        items = soup.find_all(['p', 'h3', 'div'], class_=['m-productsList_itemTitle', 'title', 'name'])
         
-        for item in items:
-            name = item.get_text().strip()
-            if name:
-                products.append(name)
+        # 策略 2: 如果策略 1 没抓到，直接抓取带有 products/item 链接的文字
+        if not items:
+            links = soup.find_all('a', href=True)
+            for link in links:
+                if '/products/item/' in link['href']:
+                    name = link.get_text().strip()
+                    if name:
+                        products.append(name)
+        else:
+            for item in items:
+                name = item.get_text().strip()
+                if name:
+                    products.append(name)
         
+        # 去重
+        products = list(set(products))
         print(f"成功抓取到 {len(products)} 个商品")
         return products
     except Exception as e:
@@ -41,32 +52,31 @@ def fetch_lookup_products():
 def main():
     current_products = fetch_lookup_products()
     
+    # 如果实在抓不到，为了调试，我们打印出网页的前 500 个字符看看
     if not current_products:
-        print("未抓取到商品，跳过本次运行。")
+        print("警告：未抓取到任何商品。请检查官网是否改版。")
         return
 
     history_file = 'history.txt'
     
-    # 读取历史记录
     if os.path.exists(history_file):
         with open(history_file, 'r', encoding='utf-8') as f:
             old_products = [line.strip() for line in f.readlines()]
     else:
         old_products = []
 
-    # 找出新品
     new_products = [p for p in current_products if p not in old_products]
 
     if new_products:
-        print(f"发现新品: {new_products}")
-        msg = "\n".join(new_products)
-        # 发送推送
+        print(f"发现新品: {len(new_products)} 个")
+        # 限制推送长度，防止消息过长
+        msg_content = "\n".join(new_products[:20]) 
         requests.post(f"https://sctapi.ftqq.com/{SC_SENDKEY}.send", 
-                      data={"title": "るかっぷ官网有更新！", "desp": msg})
+                      data={"title": f"るかっぷ官网更新({len(new_products)}件)", "desp": msg_content})
     else:
         print("没有发现新品")
 
-    # 无论是否有新品，都更新一次 history.txt 以保证文件存在
+    # 只要抓到了东西，就强制更新 history.txt
     with open(history_file, 'w', encoding='utf-8') as f:
         for p in current_products:
             f.write(f"{p}\n")
