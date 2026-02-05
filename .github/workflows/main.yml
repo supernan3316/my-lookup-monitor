@@ -2,8 +2,11 @@ name: Hourly LookUp Monitor
 
 on:
   schedule:
-    - cron: '0 * * * *'  # 每小时运行一次
-  workflow_dispatch:      # 允许我们手动测试
+    # 這裡設置的是 UTC 時間
+    # 上午 11:00 (北京/台北時間) = UTC 03:00
+    # 下午 09:00 (北京/台北時間) = UTC 13:00
+    - cron: '0 3,13 * * *'
+  workflow_dispatch: # 保留這個，方便你隨時點按鈕手動測試
 
 jobs:
   check:
