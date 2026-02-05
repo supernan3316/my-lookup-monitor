@@ -2,40 +2,45 @@ import requests
 from bs4 import BeautifulSoup
 import os
 
-# 目标网址
 TARGET_URL = "https://www.megahouse.co.jp/products/lookup/"
 SC_SENDKEY = os.environ.get("SC_SENDKEY")
 DB_FILE = "history.txt"
 
 def main():
-    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+    # 模拟真实浏览器，防止被拦截
+    headers = {
+        "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 14_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0.3 Mobile/15E148 Safari/604.1"
+    }
     try:
-        # 获取网页内容
-        res = requests.get(TARGET_URL, headers=headers)
+        res = requests.get(TARGET_URL, headers=headers, timeout=30)
         res.encoding = 'utf-8'
         soup = BeautifulSoup(res.text, "html.parser")
         
-        # 抓取所有商品名称
-        items = soup.select('.pr_card_ttl') or soup.find_all("p", class_="item_name")
+        # 尝试多种方式抓取标题
+        items = soup.select('.pr_card_ttl') or soup.select('.item_name')
         current_products = {item.get_text(strip=True) for item in items if item.get_text(strip=True)}
+        
+        print(f"当前抓取到 {len(current_products)} 个商品")
 
-        # 读取旧纪录
+        if not current_products:
+            print("警告：未能抓取到任何商品，请检查网页结构")
+            return
+
         if os.path.exists(DB_FILE):
             with open(DB_FILE, "r", encoding="utf-8") as f:
                 history = {line.strip() for line in f if line.strip()}
         else:
             history = set()
 
-        # 发现新周边
         new_items = current_products - history
 
         if new_items:
-            print(f"发现新商品: {new_items}")
             content = "\n".join(new_items)
-            # 发送到微信
-            requests.post(f"https://sctapi.ftqq.com/{SC_SENDKEY}.send", 
-                          data={"title": "るかっぷ(LookUp)出新品啦！", "desp": content})
-            # 更新历史记录
+            # 发送消息并打印结果
+            push_res = requests.post(f"https://sctapi.ftqq.com/{SC_SENDKEY}.send", 
+                                     data={"title": "LookUp新品提醒!", "desp": content})
+            print(f"推送结果: {push_res.text}")
+            
             with open(DB_FILE, "w", encoding="utf-8") as f:
                 f.write("\n".join(current_products))
         else:
