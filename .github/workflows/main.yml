@@ -1,34 +1,40 @@
-name: Hourly LookUp Monitor
+name: LookUp Monitor
 
 on:
   schedule:
-    # 這裡設置的是 UTC 時間
-    # 上午 11:00 (北京/台北時間) = UTC 03:00
-    # 下午 09:00 (北京/台北時間) = UTC 13:00
-    - cron: '0 3,13 * * *'
-  workflow_dispatch: # 保留這個，方便你隨時點按鈕手動測試
+    - cron: '0 3,13 * * *' # 每天北京时间 11点和 21点运行
+  workflow_dispatch:      # 允许手动测试
 
 jobs:
-  check:
+  build:
     runs-on: ubuntu-latest
+    # 强制声明权限
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v3
+      - name: Checkout code
+        uses: actions/checkout@v4 # 使用最新版
+
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.9'
+
       - name: Install dependencies
         run: pip install requests beautifulsoup4
-      - name: Run logic
+
+      - name: Run monitor
         env:
           SC_SENDKEY: ${{ secrets.SC_SENDKEY }}
         run: python monitor.py
-      - name: Auto save history
+
+      - name: Save history file
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          git add history.txt || true
-          git commit -m "Update history" || true
-          git push || true
+          # 检查文件是否存在，如果存在才提交
+          if [ -f history.txt ]; then
+            git add history.txt
+            git commit -m "Update history" || echo "No changes to commit"
+            git push
+          fi
