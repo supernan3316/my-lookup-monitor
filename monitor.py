@@ -23,10 +23,7 @@ def main():
         
         print(f"成功抓取到 {len(current_products)} 个商品")
 
-        # --- 调试推送：无论如何都发一条消息确认机器人活着 ---
-        debug_msg = f"机器人运行成功！当前官网共有 {len(current_products)} 个商品。"
-        requests.post(f"https://sctapi.ftqq.com/{SC_SENDKEY}.send", 
-                      data={"title": "LookUp监控检查", "desp": debug_msg})
+       
 
         # --- 原有的逻辑：发现新品才推送详细名单 ---
         if os.path.exists(DB_FILE):
